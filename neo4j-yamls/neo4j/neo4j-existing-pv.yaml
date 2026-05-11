@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: neo4j-existing-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: gp3-for-neo4j
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: vol-0dcf2af2428e7136a
+    fsType: ext4
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: topology.ebs.csi.aws.com/zone
+              operator: In
+              values:
+                - ap-northeast-2a

@@ -1,0 +1,49 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: airflow-worker
+spec:
+  template:
+    metadata:
+      labels:
+        dedicated: airflow-worker
+        node-class: ec2
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: airflow-worker
+      taints:
+        - key: dedicated
+          value: airflow-worker
+          effect: NoSchedule
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+            - ap-northeast-2a
+            - ap-northeast-2b
+            - ap-northeast-2c
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - t3.medium
+            - t3.large
+      expireAfter: 720h
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 2m
+    budgets:
+      - nodes: 10%
+  limits:
+    cpu: "32"
+    memory: "128Gi"

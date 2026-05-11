@@ -1,0 +1,14 @@
+neo4j:
+  edition: community
+  name: my-neo4j
+  nodeSelector:
+    dedicated: data-processing
+
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "data-processing"
+      effect: "NoSchedule"
+volumes:
+  data:
+    mode: "defaultStorageClass"

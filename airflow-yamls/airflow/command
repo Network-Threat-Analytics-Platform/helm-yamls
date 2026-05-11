@@ -1,0 +1,6 @@
+helm install airflow apache-airflow/airflow -f airflow-values2.yaml -n airflow
+
+helm upgrade --install airflow apache-airflow/airflow -n airflow -f airflow-values2.yaml
+
+kc apply -f airflow-logging.yaml
+kc apply -f airflow-secrets.yaml

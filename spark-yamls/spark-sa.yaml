@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spark-sa
+  namespace: spark-apps
+  annotations:
+     eks.amazonaws.com/role-arn: arn:aws:iam::790813558211:role/SparkS3Role-eks-cluster

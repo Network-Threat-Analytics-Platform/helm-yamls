@@ -1,0 +1,30 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: airflow-worker
+spec:
+  role: KarpenterNodeRole-eks-malware-jjm
+  amiSelectorTerms:
+    - alias: al2023@latest
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: eks-malware-jjm
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: eks-malware-jjm
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 1
+    httpTokens: required
+  kubelet:
+    systemReserved:
+      cpu: 200m
+      memory: 512Mi
+    kubeReserved:
+      cpu: 200m
+      memory: 512Mi
+  tags:
+    Name: karpenter-airflow-worker
+    karpenter.sh/discovery: eks-malware-jjm
+    workload: airflow-worker
