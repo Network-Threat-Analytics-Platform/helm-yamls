@@ -129,11 +129,11 @@ global:
   tolerations:
     - key: dedicated
       operator: Equal
-      value: monitoring
+      value: argocd
       effect: NoSchedule
 
   nodeSelector:
-    dedicated: monitoring
+    dedicated: argocd
 
   # Default affinity preset for all components
   affinity:
