@@ -80,7 +80,7 @@ airflowVersion: "3.0.2"
 images:
   airflow:
     repository: "790813558211.dkr.ecr.ap-northeast-2.amazonaws.com/airflow-malware-custom"
-    tag: "dcff95b"
+    tag: "c238bf6"
     # Specifying digest takes precedence over tag.
     digest: ~
     pullPolicy: IfNotPresent
