@@ -1,0 +1,1975 @@
+---
+# Source: fluent-bit-aggregator/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluent-bit-fluent-bit-aggregator
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: false
+---
+# Source: fluent-bit-aggregator/templates/configmap-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-fluent-bit-aggregator-config
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+data:
+  fluent-bit.yaml: |-
+    env:
+      ADDITIONAL_PORT_0: "24224"
+      STORAGE_PATH: "/fluent-bit/data"
+    includes: []
+    multiline_parsers: []
+    parsers:
+    - format: json
+      name: json
+    pipeline:
+      filters:
+      - key_name: log
+        match: zeek.*
+        name: parser
+        parser: json
+        preserve_key: false
+        reserve_data: true
+      - key_name: log
+        match: suricata_eve.log
+        name: parser
+        parser: json
+        preserve_key: false
+        reserve_data: true
+      - call: add_time
+        match: zeek.*
+        name: lua
+        script: /fluent-bit/scripts/add_time.lua
+      - call: add_ingest_time_suricata
+        match: suricata_eve.log
+        name: lua
+        script: /fluent-bit/scripts/add_ingest_time_suricata.lua
+      - match: zeek.conn
+        name: record_modifier
+        record:
+        - log_source zeek.conn
+        - pipeline_stage bronze
+      - match: zeek.http
+        name: record_modifier
+        record:
+        - log_source zeek.http
+        - pipeline_stage bronze
+      - match: zeek.dns
+        name: record_modifier
+        record:
+        - log_source zeek.dns
+        - pipeline_stage bronze
+      - match: zeek.ssl
+        name: record_modifier
+        record:
+        - log_source zeek.ssl
+        - pipeline_stage bronze
+      - match: suricata_eve.log
+        name: record_modifier
+        record:
+        - log_source suricata
+        - pipeline_stage bronze
+      inputs:
+      - alias: in
+        buffer_chunk_size: 1M
+        buffer_max_size: 6M
+        listen: 0.0.0.0
+        name: forward
+        port: ${ADDITIONAL_PORT_0}
+        storage.type: filesystem
+      outputs:
+      - alias: out
+        match: '*'
+        name: stdout
+      - alias: out-zeek-conn
+        brokers: kafka:9092
+        format: json
+        match: zeek.conn
+        name: kafka
+        topics: zeek-conn
+      - alias: out-zeek-http
+        brokers: kafka:9092
+        format: json
+        match: zeek.http
+        name: kafka
+        topics: zeek-http
+      - alias: out-zeek-dns
+        brokers: kafka:9092
+        format: json
+        match: zeek.dns
+        name: kafka
+        topics: zeek-dns
+      - alias: out-zeek-ssl
+        brokers: kafka:9092
+        format: json
+        match: zeek.ssl
+        name: kafka
+        topics: zeek-ssl
+      - alias: out-zeek-unified
+        brokers: kafka:9092
+        format: json
+        match: zeek.*
+        name: kafka
+        net.keepalive: true
+        net.keepalive_idle_timeout: 30
+        topics: zeek-unified
+      - alias: out-suricata
+        brokers: kafka:9092
+        format: json
+        match: suricata_eve.log
+        name: kafka
+        net.keepalive: true
+        net.keepalive_idle_timeout: 30
+        topics: suricata-eve
+    plugins: []
+    service:
+      daemon: false
+      hot_reload: false
+      http_Port: 2020
+      http_listen: 0.0.0.0
+      http_server: true
+      log_level: info
+      storage.path: ${STORAGE_PATH}
+    upstream_servers: []
+---
+# Source: fluent-bit-aggregator/templates/configmap-dashboard.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-fluent-bit-aggregator-dashboard
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+    grafana_dashboard: "1"
+data:
+  fluent-bit-fluent-bit-aggregator.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "prometheus",
+              "uid": "$DS_PROMETHEUS"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "description": "Fluent Bit Aggregator dashboard.",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "gnetId": null,
+      "graphTooltip": 1,
+      "id": 50,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 45,
+          "panels": [],
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$DS_PROMETHEUS"
+              },
+              "refId": "A"
+            }
+          ],
+          "title": "Status",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [],
+              "thresholds": {
+                "mode": "percentage",
+                "steps": [
+                  {
+                    "color": "#d44a3a",
+                    "value": null
+                  },
+                  {
+                    "color": "#299c46",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 3,
+            "x": 0,
+            "y": 1
+          },
+          "id": 6,
+          "links": [],
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "vertical",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(kube_pod_info{job=\"kube-state-metrics\",namespace=\"$namespace\",created_by_kind=\"StatefulSet\",created_by_name=\"$release\"})",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "Active Pods",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Active Pods",
+          "transparent": true,
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 5
+          },
+          "id": 43,
+          "panels": [],
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$DS_PROMETHEUS"
+              },
+              "refId": "A"
+            }
+          ],
+          "title": "Fluent Bit Metrics",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 0,
+            "y": 6
+          },
+          "id": 2,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_input_bytes_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Input Bytes Processing Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 12,
+            "y": 6
+          },
+          "id": 9,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_output_proc_bytes_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Output Bytes Processing Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "rps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 0,
+            "y": 12
+          },
+          "id": 40,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_input_records_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Input Records Processing Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "rps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 12,
+            "y": 12
+          },
+          "id": 41,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_output_proc_records_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Output Record Processing Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 0,
+            "y": 18
+          },
+          "id": 11,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_output_retries_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{pod}} Retries to {{name}}",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_output_retries_failed_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{pod}} Failed Retries to {{ name }}",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Output Retry/Failed Rates",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "errors/sec"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 12,
+            "y": 18
+          },
+          "id": 10,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_output_errors_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Output Error Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 24
+          },
+          "id": 54,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_filter_bytes_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "interval": "",
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Filter Bytes",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "rps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 24
+          },
+          "id": 55,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_filter_records_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "interval": "",
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Filter Records",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 32
+          },
+          "id": 48,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_filter_add_records_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "interval": "",
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Filter Add Records",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 32
+          },
+          "id": 47,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(fluentbit_filter_drop_records_total{job=\"$release\",namespace=\"$namespace\"}[5m])) by (pod, name)",
+              "interval": "",
+              "legendFormat": "{{pod}}/{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Filter Drop Records",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 40
+          },
+          "id": 53,
+          "panels": [],
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$DS_PROMETHEUS"
+              },
+              "refId": "A"
+            }
+          ],
+          "title": "Kubernetes Metrics",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "decbytes"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/.* request/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#F2CC0C",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.fillOpacity",
+                    "value": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 41
+          },
+          "id": 51,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{job=\"kubelet\",namespace=\"$namespace\",pod=~\"$pod\",container=\"aggregator\"}) by (pod)",
+              "interval": "",
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "avg(kube_pod_container_resource_requests{job=\"kube-state-metrics\",namespace=\"$namespace\",pod=~\"$pod\", container=\"aggregator\",resource=\"memory\"})",
+              "interval": "",
+              "legendFormat": "request",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Memory Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$DS_PROMETHEUS"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/.* request/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#F2CC0C",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.fillOpacity",
+                    "value": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 41
+          },
+          "id": 50,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\",pod=~\"$pod\",container=\"aggregator\"}) by (pod)",
+              "interval": "",
+              "legendFormat": "{{ pod }}",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$DS_PROMETHEUS"
+              },
+              "editorMode": "code",
+              "expr": "avg(kube_pod_container_resource_requests{job=\"kube-state-metrics\",namespace=\"$namespace\",pod=~\"$pod\",container=\"aggregator\",resource=\"cpu\"})",
+              "interval": "",
+              "legendFormat": "{{ pod }} request",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "5s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": [],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "selected": false,
+              "text": "Prometheus",
+              "value": "Prometheus"
+            },
+            "hide": 0,
+            "includeAll": false,
+            "label": "Datasource",
+            "multi": false,
+            "name": "DS_PROMETHEUS",
+            "options": [],
+            "query": "prometheus",
+            "queryValue": "",
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "type": "datasource"
+          },
+          {
+            "allValue": "$fullname-.*",
+            "current": {
+              "selected": false,
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "$DS_PROMETHEUS"
+            },
+            "definition": "label_values(kube_pod_info{job=\"kube-state-metrics\",namespace=\"$namespace\",created_by_kind=\"StatefulSet\",created_by_name=\"$release\"},pod)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "pod",
+            "multi": false,
+            "name": "pod",
+            "options": [],
+            "query": {
+              "query": "label_values(kube_pod_info{job=\"kube-state-metrics\",namespace=\"$namespace\",created_by_kind=\"StatefulSet\",created_by_name=\"$release\"},pod)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 2,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 0,
+            "tagValuesQuery": "",
+            "tagsQuery": "",
+            "type": "query",
+            "useTags": false
+          },
+          {
+            "hide": 2,
+            "label": "Namespace",
+            "name": "namespace",
+            "query": "kafka",
+            "skipUrlSync": false,
+            "type": "constant"
+          },
+          {
+            "hide": 2,
+            "label": "Release",
+            "name": "release",
+            "query": "fluent-bit",
+            "skipUrlSync": false,
+            "type": "constant"
+          },
+          {
+            "hide": 2,
+            "label": "Full Name",
+            "name": "fullname",
+            "query": "fluent-bit-fluent-bit-aggregator",
+            "skipUrlSync": false,
+            "type": "constant"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timepicker": {
+        "refresh_intervals": [
+          "5s",
+          "10s",
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "2h",
+          "1d"
+        ],
+        "time_options": [
+          "5m",
+          "15m",
+          "1h",
+          "6h",
+          "12h",
+          "24h",
+          "2d",
+          "7d",
+          "30d"
+        ]
+      },
+      "timezone": "",
+      "title": "fluent-bit-fluent-bit-aggregator",
+      "uid": "77c35b4415ee29582985ede6e65fb1063fc72973",
+      "version": 0,
+      "weekStart": ""
+    }
+---
+# Source: fluent-bit-aggregator/templates/configmap-scripts.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-fluent-bit-aggregator-scripts
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+data:
+  add_ingest_time_suricata.lua: |-
+    function add_ingest_time_suricata(timestamp, record)
+      local ts_num = tonumber(timestamp)
+      local sec = math.floor(ts_num)
+    
+      record["ingest_datetime"] =
+          os.date("%Y-%m-%d %H:%M:%S", os.time() + 9 * 3600)
+          
+      record["event_datetime"] =
+          os.date("%Y-%m-%d %H:%M:%S", sec + 9 * 3600)
+    
+      return 1, timestamp, record
+    end    
+    
+  add_time.lua: |-
+    function add_time(tag, timestamp, record)
+    
+      local sec = math.floor(timestamp)
+      local frac = timestamp - sec
+      local usec = math.floor(frac * 1000000)
+    
+    
+      -- event 시간: KST, 오프셋 없이
+      record["event_datetime"] =
+          os.date("%Y-%m-%d %H:%M:%S", sec + 9 * 3600)
+    
+      record["event_datetime_ms"] =
+          os.date("%Y-%m-%d %H:%M:%S", sec + 9 * 3600) ..
+          string.format(".%06d", usec)
+    
+      record["event_date"] =
+          os.date("%Y-%m-%d", sec + 9 * 3600)
+    
+      -- ingest 시간: KST, 오프셋 없이
+      record["ingest_datetime"] =
+          os.date("%Y-%m-%d %H:%M:%S", os.time() + 9 * 3600)
+    
+      return 1, timestamp, record
+    end
+---
+# Source: fluent-bit-aggregator/templates/service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit-fluent-bit-aggregator-headless
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+    prometheus.io/service-monitor: "false"
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 2020
+      targetPort: http
+      protocol: TCP
+    - name: http-forward
+      port: 24224
+      targetPort: http-forward
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+---
+# Source: fluent-bit-aggregator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit-fluent-bit-aggregator
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 2020
+      targetPort: http
+      protocol: TCP
+    - name: http-forward
+      port: 24224
+      targetPort: http-forward
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+---
+# Source: fluent-bit-aggregator/templates/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: fluent-bit-fluent-bit-aggregator
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  serviceName: fluent-bit-fluent-bit-aggregator-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit-aggregator
+      app.kubernetes.io/instance: fluent-bit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fluent-bit-aggregator
+        app.kubernetes.io/instance: fluent-bit
+      annotations:
+        checksum/config: 65c6a55be952b02070a17537fb14e093fede315eeb9ae46087176e6a0b2c836a
+        checksum/scripts: 2236fdf4c080e23cfedb98d07281e770016bbfcf29688b280a6361ddf11d2ede
+    spec:
+      serviceAccountName: fluent-bit-fluent-bit-aggregator
+      securityContext:
+        fsGroup: 65534
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: aggregator
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 65532
+            runAsNonRoot: false
+            runAsUser: 65532
+          image: ghcr.io/fluent/fluent-bit:4.2.3
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POD_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+            - name: ADDITIONAL_PORT_HTTP_FORWARD
+              value: "24224"
+            - name: CONFIG_PATH
+              value: /fluent-bit/etc/conf
+            - name: STORAGE_PATH
+              value: /fluent-bit/data
+            - name: SCRIPTS_PATH
+              value: /fluent-bit/scripts
+          command:
+            - /fluent-bit/bin/fluent-bit
+          args:
+            - --workdir=/fluent-bit/etc
+            - --config=/fluent-bit/etc/conf/fluent-bit.yaml
+          ports:
+            - name: http
+              containerPort: 2020
+              protocol: TCP
+            - name: http-forward
+              containerPort: 24224
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 12
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: config
+              mountPath: /fluent-bit/etc/conf
+            - name: scripts
+              mountPath: /fluent-bit/scripts
+            - name: data
+              mountPath: /fluent-bit/data
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+            requests:
+              cpu: "1"
+              memory: 2Gi
+      volumes:
+        - name: config
+          configMap:
+            name: fluent-bit-fluent-bit-aggregator-config
+        - name: scripts
+          configMap:
+            name: fluent-bit-fluent-bit-aggregator-scripts
+        - name: data
+          emptyDir: {}
+      nodeSelector:
+        dedicated: kafka
+      tolerations:
+        - effect: NoSchedule
+          key: dedicated
+          operator: Equal
+          value: kafka
+---
+# Source: fluent-bit-aggregator/templates/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fluent-bit-fluent-bit-aggregator
+  namespace: kafka
+  labels:
+    helm.sh/chart: fluent-bit-aggregator-1.0.0-beta.3
+    app.kubernetes.io/name: fluent-bit-aggregator
+    app.kubernetes.io/instance: fluent-bit
+    app.kubernetes.io/version: "4.2.3"
+    app.kubernetes.io/managed-by: Helm
+    release: monitoring
+spec:
+  jobLabel: app.kubernetes.io/instance
+  namespaceSelector:
+    matchNames:
+      - kafka
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit-aggregator
+      app.kubernetes.io/instance: fluent-bit
+    matchExpressions:
+      - key: prometheus.io/service-monitor
+        operator: NotIn
+        values:
+          - "false"
+  endpoints:
+    - port: http
+      path: /api/v2/metrics/prometheus

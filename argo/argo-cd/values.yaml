@@ -43,7 +43,7 @@ crds:
 global:
   # -- Default domain used by all components
   ## Used for ingresses, certificates, SSO, notifications, etc.
-  domain: argocd.example.com
+  domain: ""
 
   # -- Runtime class name for all components
   runtimeClassName: ""
@@ -2395,12 +2395,20 @@ server:
 
   ## Server service configuration
   service:
-    # -- Server service annotations
-    annotations: {}
+    
     # -- Server service labels
     labels: {}
     # -- Server service type
-    type: ClusterIP
+    # type: ClusterIP
+
+    # 도메인/host 없이 진짜 LoadBalancer만 쓰고 싶을때
+    type: LoadBalancer
+    # -- Server service annotations
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+      service.beta.kubernetes.io/aws-load-balancer-type: external
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+
     # -- Server service http port for NodePort service type (only if `server.service.type` is set to "NodePort")
     nodePortHttp: 30080
     # -- Server service https port for NodePort service type (only if `server.service.type` is set to "NodePort")
@@ -2496,7 +2504,7 @@ server:
   # Argo CD server ingress configuration
   ingress:
     # -- Enable an ingress resource for the Argo CD server
-    enabled: true
+    enabled: false
     # -- Specific implementation for ingress controller. One of `generic`, `aws` or `gke`
     ## Additional configuration might be required in related configuration sections
     controller: generic
@@ -2504,7 +2512,7 @@ server:
     labels: {}
     # -- Additional ingress annotations
     ## Ref: https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/#option-1-ssl-passthrough
-    annotations:
+    annotations: 
       # 인터넷에서 접속 가능하도록 설정
       alb.ingress.kubernetes.io/scheme: internet-facing
       # 대상 타입을 IP로 설정 (EKS 권장)
