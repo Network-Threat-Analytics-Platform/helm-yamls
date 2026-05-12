@@ -58,6 +58,11 @@ hook:
   # -- Node selector for the Helm hook Job.
   nodeSelector:
     dedicated: spark
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "spark"
+      effect: "NoSchedule"
 
   # -- Affinity for the Helm hook Job.
   affinity: {}
@@ -184,6 +189,11 @@ controller:
   # -- Node selector for controller pods.
   nodeSelector:
     dedicated: spark
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "spark"
+      effect: "NoSchedule"
 
   # -- Affinity for controller pods.
   affinity: {}
@@ -358,7 +368,13 @@ webhook:
       sizeLimit: 500Mi
 
   # -- Node selector for webhook pods.
-  nodeSelector: {}
+  nodeSelector:
+    dedicated: spark
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "spark"
+      effect: "NoSchedule"
 
   # -- Affinity for webhook pods.
   affinity: {}

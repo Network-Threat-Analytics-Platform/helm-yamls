@@ -3,15 +3,15 @@ kind: EC2NodeClass
 metadata:
   name: airflow-worker
 spec:
-  role: KarpenterNodeRole-eks-malware-jjm
+  role: KarpenterNodeRole-eks-malware-rfq
   amiSelectorTerms:
     - alias: al2023@latest
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: eks-malware-jjm
+        karpenter.sh/discovery: eks-malware-rfq
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: eks-malware-jjm
+        karpenter.sh/discovery: eks-malware-rfq
   metadataOptions:
     httpEndpoint: enabled
     httpProtocolIPv6: disabled
@@ -26,5 +26,5 @@ spec:
       memory: 512Mi
   tags:
     Name: karpenter-airflow-worker
-    karpenter.sh/discovery: eks-malware-jjm
+    karpenter.sh/discovery: eks-malware-rfq
     workload: airflow-worker
