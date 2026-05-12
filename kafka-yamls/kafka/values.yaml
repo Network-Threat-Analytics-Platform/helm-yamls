@@ -6,6 +6,9 @@ image:
 kraft:
   enabled: true
 
+provisioning:
+  enabled: false
+
 zookeeper:
   enabled: false
 
